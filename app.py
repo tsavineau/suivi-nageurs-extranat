@@ -5,16 +5,21 @@ from models import db, TempsQualification, Nageur
 from constants import nettoyer_epreuve
 from scraper import scraper_et_enregistrer_temps, obtenir_qualifies_club, enregistrer_nageurs_bdd
 from extranatapi import Wrapper
-
+import os
 import json
 
 app = Flask(__name__)
 
-# Configuration de la base de données SQLite local
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///natation.db'
+# En local : utilise SQLite. Sur Render : utilisera la variable d'environnement
+db_url = os.environ.get('DATABASE_URL', 'sqlite:///database.db')
+
+# Correctif de compatibilité SQLAlchemy pour Render (postgres:// -> postgresql://)
+if db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql://", 1)
+
+app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# Initialisation de SQLAlchemy avec l'application Flask
 db.init_app(app)
 
 # Configuration du cache (en mémoire vive)
@@ -240,9 +245,9 @@ def get_nageur_summary(iuf):
     except Exception as e:
         app.logger.error(f'Erreur lors du calcul du summary pour {iuf} : {e}')
         return jsonify({'error': str(e)}), 500
+    
+with app.app_context():
+  db.create_all()
 
 if __name__ == '__main__':
-    # Crée les tables SQLite automatiquement au lancement s'il s'agit du premier démarrage
-    with app.app_context():
-        db.create_all()
-    app.run()
+    app.run(debug=True)
