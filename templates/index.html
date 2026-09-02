@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nageurs - DRP</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body>
+
+    <h1>Liste des Nageurs DéRapéS</h1>
+
+    <button id="btnScrape" class="btn-sync" onclick="lancerScraping()" style="display:none">
+        🔄 Mettre à jour les nageurs via Extranat
+    </button>
+    <div id="statusMessage" class="status"></div>
+
+    <!-- Conteneur de sélection du nageur -->
+    <div class="select-container" style="margin: 20px 0;">
+        <label for="selectNageur" style="font-weight: bold; margin-right: 10px;">Sélectionner un nageur :</label>
+        <select id="selectNageur" style="padding: 8px; font-size: 1rem; min-width: 250px;">
+            <option value="">-- Choisir un nageur --</option>
+            {% for nageur in nageurs %}
+            <option value="{{ nageur.licence }}">
+                {{ nageur.nom_prenom }} ({{ nageur.categorie }})
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <!-- Section d'affichage des performances sous le tableau -->
+    <div id="section-performances" style="display: none; margin-top: 20px;">
+        <table id="table-performances" class="table">
+            <thead>
+                <tr>
+                    <th>Nage</th>
+                    <th>Records</th>
+                    <th>Temps valides</th>
+                    <th>Qualif N2</th>
+                    <th>Qualif N1</th>
+                </tr>
+            </thead>
+            <tbody id="body-performances">
+            </tbody>
+        </table>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
+</body>
+
+</html>
