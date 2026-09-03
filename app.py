@@ -10,14 +10,25 @@ import json
 
 app = Flask(__name__)
 
-# Définition d'un chemin absolu vers le fichier SQLite dans le dossier du projet
+# 1. Définition des chemins absolus
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(
-    BASE_DIR, 'database.db'
-)
+
+# 2. Création automatique d'un dossier 'instance' dédié à la BDD
+INSTANCE_PATH = os.path.join(BASE_DIR, 'instance')
+os.makedirs(INSTANCE_PATH, exist_ok=True)
+
+# 3. Path absolu de la base de données
+DB_PATH = os.path.join(INSTANCE_PATH, 'natation.db')
+
+# 4. Configuration Flask / SQLAlchemy
+app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{DB_PATH}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db.init_app(app)
+
+# 5. Initialisation automatique des tables si la BDD est neuve
+with app.app_context():
+    db.create_all()
 
 # Configuration du cache (en mémoire vive)
 app.config['CACHE_TYPE'] = 'SimpleCache'
