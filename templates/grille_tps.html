@@ -17,9 +17,9 @@
     <!-- Barre d'outils alignée en ligne -->
     <form id="form-grille" class="toolbar">
         <select id="annee" name="annee" class="select-input" required>
-            <option value="2027">Saison 2027</option>
-            <option value="2026">Saison 2026</option>
-            <option value="2025">Saison 2025</option>
+            {% for valeur, libelle in annees_grille %}
+            <option value="{{ valeur }}">{{ libelle }}</option>
+            {% endfor %}
         </select>
 
         <select id="type_qualif" name="type_qualif" class="select-input" required>

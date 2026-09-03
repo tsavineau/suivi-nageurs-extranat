@@ -20,6 +20,10 @@ class TempsQualification(db.Model):
     
     # Contrainte d'unicité pour éviter les doublons lors du re-scraping
     __table_args__ = (
+        db.Index(
+            'ix_tps_qualif_annee_type_genre',
+            'annee', 'type_qualif', 'genre'
+        ),
         db.UniqueConstraint(
             'annee', 'categorie', 'genre', 'epreuve', 'type_qualif', 'bassin',
             name='uix_grid_entry'

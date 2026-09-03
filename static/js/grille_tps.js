@@ -1,3 +1,13 @@
+function echapperHtml(valeur) {
+    return String(valeur ?? '').replace(/[&<>"']/g, caractere => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+    }[caractere]));
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const formGrille = document.getElementById('form-grille');
     const loadingDiv = document.getElementById('loading');
@@ -62,7 +72,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // 1. Extraction des catégories uniques et des épreuves uniques
         const categoriesSet = new Set();
         const epreuvesSet = new Set();
-        const matrice = {}; // Format : { '100 NL': { 'C1': '00:52.00', 'C2': '00:54.00' } }
+        const matrice = Object.create(null); // Format : { '100 NL': { 'C1': '00:52.00', 'C2': '00:54.00' } }
 
         donneesPlates.forEach(item => {
             const epreuve = item.epreuve;
@@ -73,7 +83,7 @@ document.addEventListener('DOMContentLoaded', () => {
             categoriesSet.add(cat);
 
             if (!matrice[epreuve]) {
-                matrice[epreuve] = {};
+                matrice[epreuve] = Object.create(null);
             }
             matrice[epreuve][cat] = temps;
         });
@@ -115,13 +125,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 4. Construction du tableau HTML moderne
         let html = `
-            <h2 class="nageur-title">${titreFormat}</h2>
+            <h2 class="nageur-title">${echapperHtml(titreFormat)}</h2>
             <div class="table-responsive">
                 <table class="modern-table">
                     <thead>
                         <tr>
                             <th>Epreuve / Nage</th>
-                            ${categories.map(cat => `<th>${cat}</th>`).join('')}
+                            ${categories.map(cat => `<th>${echapperHtml(cat)}</th>`).join('')}
                         </tr>
                     </thead>
                     <tbody>
@@ -131,10 +141,10 @@ document.addEventListener('DOMContentLoaded', () => {
         epreuves.forEach(epreuve => {
             html += `
                 <tr>
-                    <td class="nage">${epreuve}</td>
+                    <td class="nage">${echapperHtml(epreuve)}</td>
                     ${categories.map(cat => {
                         const temps = matrice[epreuve][cat] || '-';
-                        return `<td class="time">${temps}</td>`;
+                        return `<td class="time">${echapperHtml(temps)}</td>`;
                     }).join('')}
                 </tr>
             `;

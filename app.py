@@ -7,6 +7,9 @@ from scraper import scraper_et_enregistrer_temps, obtenir_qualifies_club, enregi
 from extranatapi import Wrapper
 import os
 import json
+from math import ceil
+from threading import Lock
+from time import monotonic
 
 app = Flask(__name__)
 
@@ -33,8 +36,11 @@ with app.app_context():
 # Configuration du cache (en mémoire vive)
 app.config['CACHE_TYPE'] = 'SimpleCache'
 app.config['CACHE_DEFAULT_TIMEOUT'] = 3600  # Durée de conservation : 1 heure (en secondes)
+app.config['SCRAPING_MIN_INTERVAL'] = 300  # Délai minimal entre deux scrapes (5 minutes)
 
 cache = Cache(app)
+scraping_lock = Lock()
+dernier_scraping_at = 0.0
 
 def get_annee_saison_courante() -> str:
     """Retourne l'année de la saison sous forme de chaîne (ex: '2026')."""
@@ -42,25 +48,25 @@ def get_annee_saison_courante() -> str:
     annee = aujourdhui.year + 1 if aujourdhui.month >= 9 else aujourdhui.year
     return str(annee)
 
-def chercher_temps_qualif(annee, genre_db, epreuve, bassin, categorie, type_qualif_code):
-    # Le bassin n'est pas discriminant pour les codes N1/N2 50 m.
-    filtres = {
-        'annee': annee,
-        'genre': genre_db,
-        'epreuve': epreuve,
-        'categorie': categorie,
-        'type_qualif': str(type_qualif_code),
-    }
-    if bassin is not None:
-        filtres['bassin'] = bassin
-
-    stmt = db.select(TempsQualification).filter_by(**filtres).limit(2)
-    enregistrements = db.session.execute(stmt).scalars().all()
-    temps = [enregistrement.temps for enregistrement in enregistrements if enregistrement.temps]
-
-    if not temps:
-        return '-'
-    return temps[0] if len(temps) == 1 else temps
+def charger_minima_qualif(annee, genre_db, epreuves, categorie, types_qualif):
+    """Charge en une fois les minima nécessaires au résumé d'un nageur."""
+    stmt = db.select(TempsQualification).where(
+        TempsQualification.annee == str(annee),
+        TempsQualification.genre == genre_db,
+        TempsQualification.epreuve.in_(epreuves),
+        TempsQualification.categorie == categorie,
+        TempsQualification.type_qualif.in_(types_qualif),
+    )
+    minima = {}
+    for minimum in db.session.execute(stmt).scalars():
+        cle = (
+            minimum.epreuve,
+            minimum.bassin,
+            minimum.categorie,
+            minimum.type_qualif,
+        )
+        minima[cle] = minimum.temps or '-'
+    return minima
 
 def obtenir_derniere_annee_qualif(annee_max):
     return db.session.execute(
@@ -97,7 +103,13 @@ def afficher_nageurs():
 
 @app.route('/grille_tps')
 def grille_tps():
-    return render_template('grille_tps.html')
+    saison_courante = int(get_annee_saison_courante())
+    annees_grille = [
+        (saison_courante, f'Saison {saison_courante} (en cours)'),
+        (saison_courante - 1, f'Saison {saison_courante - 1} (précédente)')
+    ]
+
+    return render_template('grille_tps.html', annees_grille=annees_grille)
 
 # ==========================================
 # API
@@ -106,12 +118,34 @@ def grille_tps():
 @app.route('/api/scraper-nageurs', methods=['POST'])
 def lancer_scraping_nageurs():
     """Route API appelée par le frontend pour lancer le scraping."""
+    global dernier_scraping_at
+
+    if not scraping_lock.acquire(blocking=False):
+        return jsonify({
+            'success': False,
+            'erreur': 'Une mise à jour est déjà en cours.'
+        }), 429
+
     try:
+        maintenant = monotonic()
+        delai_restant = app.config['SCRAPING_MIN_INTERVAL'] - (maintenant - dernier_scraping_at)
+        if delai_restant > 0:
+            return jsonify({
+                'success': False,
+                'erreur': 'Mise à jour trop fréquente.',
+                'retry_after': ceil(delai_restant),
+            }), 429
+
+        dernier_scraping_at = maintenant
+
         # 1. Scraping sur Extranat
         donnees_scrapees = obtenir_qualifies_club()
         
         # 2. Enregistrement / mise à jour en BDD (sans doublons)
         nb_enregistres = enregistrer_nageurs_bdd(donnees_scrapees)
+
+        # Les résumés peuvent dépendre des données fraîchement mises à jour.
+        cache.clear()
         
         # 3. Récupération de la liste à jour
         nageurs = Nageur.query.order_by(Nageur.nom_prenom).all()
@@ -127,6 +161,8 @@ def lancer_scraping_nageurs():
 
     except Exception as e:
         return jsonify({'success': False, 'erreur': str(e)}), 500
+    finally:
+        scraping_lock.release()
 
 @app.route('/api/grille', methods=['GET'])
 def get_grille():
@@ -196,6 +232,37 @@ def get_nageur_summary(iuf):
         if obj_mpp is None or obj_all is None:
             return jsonify({'error': 'Nageur introuvable sur Extranat'}), 404
 
+        epreuves = {nettoyer_epreuve(mpp.name) for mpp in obj_mpp.nages}
+        minima_qualif = charger_minima_qualif(
+            annee=annee_saison,
+            genre_db=genre_qualif,
+            epreuves=epreuves,
+            categorie=categorie_qualif,
+            types_qualif=('84', '85', '86', '87'),
+        )
+
+        performances_par_nage_bassin = {}
+        for n in obj_all.nages:
+            if isinstance(n.date, str):
+                annee_perf = int(n.date.split('/')[-1])
+            elif hasattr(n.date, 'year'):
+                annee_perf = n.date.year
+            else:
+                annee_perf = 0
+
+            if annee_perf < saison_min:
+                continue
+
+            performance = {
+                'temps': n.temps,
+                'points': n.points,
+                'date': n.date,
+                'annee': annee_perf,
+                'bassin': normaliser_bassin(n.bassin),
+            }
+            cle = (n.name, performance['bassin'])
+            performances_par_nage_bassin.setdefault(cle, []).append(performance)
+
         summary_data = []
 
         for mpp in obj_mpp.nages:
@@ -206,32 +273,17 @@ def get_nageur_summary(iuf):
             code_n2 = '87' if bassin_int == 25 else '86'
             qualification_multi_bassin = code_n1 == '84' or code_n2 == '86'
 
-            # Filtrer toutes les performances de la même nage/bassin réalisées lors des 3 dernières saisons
-            historique_filtre = []
-            performances_qualification = []
-            for n in obj_all.nages:
-                if n.name == mpp.name and (
-                    normaliser_bassin(n.bassin) == bassin_int or qualification_multi_bassin
-                ):
-                    # Extraction de l'année de la perf (gère un objet datetime ou un string "DD/MM/YYYY")
-                    if isinstance(n.date, str):
-                        annee_perf = int(n.date.split('/')[-1])
-                    elif hasattr(n.date, 'year'):
-                        annee_perf = n.date.year
-                    else:
-                        annee_perf = 0
-
-                    if annee_perf >= saison_min:
-                        performance = {
-                            'temps': n.temps,
-                            'points': n.points,
-                            'date': n.date,
-                            'annee': annee_perf,
-                            'bassin': normaliser_bassin(n.bassin),
-                        }
-                        performances_qualification.append(performance)
-                        if normaliser_bassin(n.bassin) == bassin_int:
-                            historique_filtre.append(performance)
+            # Les qualifications 50 m prennent en compte les performances des deux bassins.
+            historique_filtre = performances_par_nage_bassin.get((mpp.name, bassin_int), [])
+            if qualification_multi_bassin:
+                performances_qualification = [
+                    performance
+                    for (nom_nage, _), performances in performances_par_nage_bassin.items()
+                    if nom_nage == mpp.name
+                    for performance in performances
+                ]
+            else:
+                performances_qualification = historique_filtre
 
             # requêtes SQL sur la table tps_qualif
             def charger_minima(type_qualif_code):
@@ -245,14 +297,12 @@ def get_nageur_summary(iuf):
                         ]),
                     }
                     for bassin in bassins
-                    for temps in [chercher_temps_qualif(
-                            annee=annee_saison,
-                            genre_db=genre_qualif,
-                            epreuve=nettoyer_epreuve(mpp.name),
-                            bassin=bassin,
-                            categorie=categorie_qualif,
-                            type_qualif_code=type_qualif_code,
-                        )]
+                    for temps in [minima_qualif.get((
+                            nettoyer_epreuve(mpp.name),
+                            bassin,
+                            categorie_qualif,
+                            type_qualif_code,
+                        ), '-')]
                 ]
 
             t_n1 = charger_minima(code_n1)

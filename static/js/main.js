@@ -1,3 +1,15 @@
+let statusMessageTimer;
+
+function afficherStatus(status, message, couleur) {
+  clearTimeout(statusMessageTimer);
+  status.style.display = 'block';
+  status.style.color = couleur;
+  status.innerText = message;
+  statusMessageTimer = setTimeout(() => {
+    status.style.display = 'none';
+  }, 5000);
+}
+
 async function lancerScraping() {
   const btn = document.getElementById('btnScrape');
   const status = document.getElementById('statusMessage');
@@ -5,16 +17,14 @@ async function lancerScraping() {
 
   // Blocage du bouton pendant la requête
   btn.disabled = true;
-  status.style.color = 'black';
-  status.innerText = "Récupération en cours depuis Extranat...";
+  afficherStatus(status, "Récupération en cours depuis Extranat...", 'black');
 
   try {
     const response = await fetch('/api/scraper-nageurs', { method: 'POST' });
     const data = await response.json();
 
     if (data.success) {
-      status.style.color = 'green';
-      status.innerText = data.message;
+      afficherStatus(status, data.message, 'green');
 
       // Sauvegarde du nageur actuellement sélectionné
       const currentSelectedIuf = selectNageur.value;
@@ -37,12 +47,10 @@ async function lancerScraping() {
         }
       }
     } else {
-      status.style.color = 'red';
-      status.innerText = "Erreur : " + (data.erreur || data.message || "Échec du scraping");
+      afficherStatus(status, "Erreur : " + (data.erreur || data.message || "Échec du scraping"), 'red');
     }
   } catch (err) {
-    status.style.color = 'red';
-    status.innerText = "Erreur de communication avec le serveur.";
+    afficherStatus(status, "Erreur de communication avec le serveur.", 'red');
   } finally {
     btn.disabled = false;
   }
@@ -56,6 +64,16 @@ function convertirTempsEnSecondes(tempsStr) {
     return parseFloat(parties[0]) * 60 + parseFloat(parties[1]);
   }
   return parseFloat(parties[0]);
+}
+
+function echapperHtml(valeur) {
+  return String(valeur ?? '').replace(/[&<>"']/g, caractere => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[caractere]));
 }
 
 function normaliserBassin(bassin) {
@@ -91,8 +109,25 @@ function formaterEcart(ecartSec) {
   return ` (+${ecartSec.toFixed(2)})`;
 }
 
+function indexerPerformancesParBassin(listePerfs) {
+  const performancesParBassin = new Map();
+
+  (listePerfs || []).forEach(perf => {
+    const tempsSec = convertirTempsEnSecondes(perf.temps);
+    if (tempsSec === null) return;
+
+    const bassin = normaliserBassin(perf.bassin);
+    if (!performancesParBassin.has(bassin)) {
+      performancesParBassin.set(bassin, []);
+    }
+    performancesParBassin.get(bassin).push(tempsSec);
+  });
+
+  return performancesParBassin;
+}
+
 // Helper d'affichage pour les colonnes de minima
-function genererCelluleMinima(listePerfs, minimaStr) {
+function genererCelluleMinima(performancesParBassin, minimaStr) {
   if (!minimaStr || minimaStr.length === 0) return '-';
 
   const minima = minimaStr.filter(item => item.temps !== '-');
@@ -102,12 +137,7 @@ function genererCelluleMinima(listePerfs, minimaStr) {
     const badge = item.qualifie
       ? '<span class="badge-success">✓</span>'
       : '<span class="badge-danger">✗</span>';
-    const performancesBassin = (listePerfs || []).filter(perf =>
-      normaliserBassin(perf.bassin) === normaliserBassin(item.bassin)
-    );
-    const meilleursTemps = performancesBassin
-      .map(perf => convertirTempsEnSecondes(perf.temps))
-      .filter(temps => temps !== null);
+    const meilleursTemps = performancesParBassin.get(normaliserBassin(item.bassin)) || [];
     const ecartSec = meilleursTemps.length > 0
       ? Math.min(...meilleursTemps) - convertirTempsEnSecondes(item.temps)
       : 0;
@@ -115,7 +145,7 @@ function genererCelluleMinima(listePerfs, minimaStr) {
       ? `<span class="ecart-time">${formaterEcart(ecartSec)}</span>`
       : '';
 
-    return `<div class="minima-line">${item.temps} (${item.bassin}m) ${badge}${ecart}</div>`;
+    return `<div class="minima-line">${echapperHtml(item.temps)} (${echapperHtml(item.bassin)}m) ${badge}${ecart}</div>`;
   }).join('');
 }
 
@@ -145,6 +175,7 @@ document.addEventListener('DOMContentLoaded', () => {
         bodyPerf.innerHTML = '<tr><td colspan="5">Aucune performance trouvée.</td></tr>';
       } else {
         let bassinActuel = null;
+        const fragment = document.createDocumentFragment();
 
         data.performances.forEach(item => {
           // Séparateur de bassin
@@ -153,14 +184,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const rowHeader = document.createElement('tr');
             rowHeader.innerHTML = `
               <td colspan="5" class="type_bassin">
-                Bassin de ${bassinActuel || 'Non spécifié'}
+                Bassin de ${echapperHtml(bassinActuel || 'Non spécifié')}
               </td>
             `;
-            bodyPerf.appendChild(rowHeader);
+            fragment.appendChild(rowHeader);
           }
 
           // Formatage de la MPP
-          const mppStr = `<span class="time">${item.mpp.temps}</span> <span class="detail">(${item.mpp.points}) - ${item.mpp.date}</span>`;
+          const mppStr = `<span class="time">${echapperHtml(item.mpp.temps)}</span> <span class="detail">(${echapperHtml(item.mpp.points)}) - ${echapperHtml(item.mpp.date)}</span>`;
 
           // Formatage des performances avec ajout de l'icône sur le record
           const perfsSaisons = item.perfs_trois_saisons || [];
@@ -170,33 +201,36 @@ document.addEventListener('DOMContentLoaded', () => {
                   const estRecord = n.temps === item.mpp.temps;
                   const iconeRecord = estRecord ? ' <span class="icon-record" title="Record personnel (MPP)">⭐</span>' : '';
 
-                  return `<span class="time">${n.temps}</span> <span class="detail">(${n.points}) - ${n.date}</span>${iconeRecord}`;
+                  return `<span class="time">${echapperHtml(n.temps)}</span> <span class="detail">(${echapperHtml(n.points)}) - ${echapperHtml(n.date)}</span>${iconeRecord}`;
                 })
                 .join('<br>')
             : '-';
 
           // Génération de l'affichage N1 et N2 avec gestion de l'éventuel écart
           const perfsQualification = item.perfs_qualification || perfsSaisons;
+          const performancesParBassin = indexerPerformancesParBassin(perfsQualification);
           const strN2 = genererCelluleMinima(
-            perfsQualification,
+            performancesParBassin,
             item.minima_n2
           );
           const strN1 = genererCelluleMinima(
-            perfsQualification,
+            performancesParBassin,
             item.minima_n1
           );
 
           // Construction de la ligne du tableau
           const row = document.createElement('tr');
           row.innerHTML = `
-            <td class="nage">${item.nage}</td>
+            <td class="nage">${echapperHtml(item.nage)}</td>
             <td>${mppStr}</td>
             <td>${perfsSaisonsStr}</td>
             <td class="qualif-cell">${strN2}</td>
             <td class="qualif-cell">${strN1}</td>
           `;
-          bodyPerf.appendChild(row);
+          fragment.appendChild(row);
         });
+
+        bodyPerf.appendChild(fragment);
       }
 
       sectionPerf.style.display = 'block';
