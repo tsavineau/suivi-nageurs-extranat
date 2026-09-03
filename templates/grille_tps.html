@@ -4,49 +4,50 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Consultation des Temps de Qualification FFN</title>
+    <title>Grilles de Qualification FFN - DRP</title>
+    <!-- Utilisation de la feuille de style commune style.css -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/grille_tps.css') }}">
 </head>
 
 <body>
 
-    <div class="card">
-        <h2>Grilles de Qualification FFN</h2>
+    <h1>Grilles de Qualification FFN</h1>
 
-        <!-- Formulaire dynamique -->
-        <form id="form-grille">
-            <div class="form-group">
-                <label for="annee">Saison :</label>
-                <select id="annee" name="annee" required>
-                    <option value="2027">2027</option>
-                    <option value="2026">2026</option>
-                    <option value="2025">2025</option>
-                </select>
-            </div>
+    <!-- Barre d'outils alignée en ligne -->
+    <form id="form-grille" class="toolbar">
+        <select id="annee" name="annee" class="select-input" required>
+            <option value="2027">Saison 2027</option>
+            <option value="2026">Saison 2026</option>
+            <option value="2025">Saison 2025</option>
+        </select>
 
-            <div class="form-group">
-                <label for="type_qualif">Compétition / Type :</label>
-                <select id="type_qualif" name="type_qualif" required>
-                    <option value="84">N1 - Bassin 50m</option>
-                    <option value="85">N1 - Bassin 25m</option>
-                    <option value="86">N2 - Bassin 50m</option>
-                    <option value="87">N2 - Bassin 25m</option>
-                </select>
-            </div>
+        <select id="type_qualif" name="type_qualif" class="select-input" required>
+            <option value="84">N1 - Bassin 50m</option>
+            <option value="85">N1 - Bassin 25m</option>
+            <option value="86">N2 - Bassin 50m</option>
+            <option value="87">N2 - Bassin 25m</option>
+        </select>
 
-            <div class="form-group">
-                <label for="genre">Sexe :</label>
-                <select id="genre" name="genre" required>
-                    <option value="1">Messieurs</option>
-                    <option value="2">Dames</option>
-                </select>
-            </div>
-            <button type="submit">Charger la grille</button>
-        </form>
+        <select id="genre" name="genre" class="select-input" required>
+            <option value="1">Messieurs</option>
+            <option value="2">Dames</option>
+        </select>
 
-        <div id="loading">Chargement et vérification des données en cours...</div>
-        <div id="resultats"></div>
-    </div>
+        <button type="submit" class="btn-sync">
+            🔍 Charger la grille
+        </button>
+
+        <a href="{{ url_for('afficher_nageurs') }}" class="btn-sync">
+            ⬅️ Retour aux nageurs
+        </a>
+    </form>
+
+    <div id="loading" class="status" style="display: none;">Chargement et vérification des données en cours...</div>
+
+    <!-- Conteneur de la grille chargée -->
+    <div id="resultats" class="card-container" style="display: none;"></div>
+
     <script src="{{ url_for('static', filename='js/grille_tps.js') }}" defer></script>
 </body>
 

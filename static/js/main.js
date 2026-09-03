@@ -6,7 +6,7 @@ async function lancerScraping() {
   // Blocage du bouton pendant la requête
   btn.disabled = true;
   status.style.color = 'black';
-  status.innerText = "Scraping en cours depuis Extranat...";
+  status.innerText = "Récupération en cours depuis Extranat...";
 
   try {
     const response = await fetch('/api/scraper-nageurs', { method: 'POST' });
