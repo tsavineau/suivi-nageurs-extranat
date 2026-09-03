@@ -2,6 +2,7 @@ __pycache__/
 *.pyc
 venv/
 .env
+instance/
 *.db
 *.sqlite3
 .vscode/
