@@ -59,7 +59,7 @@ def afficher_nageurs():
     return render_template('index.html', nageurs=nageurs)
 
 @app.route('/grille_tps')
-def index():
+def grille_tps():
     return render_template('grille_tps.html')
 
 # ==========================================

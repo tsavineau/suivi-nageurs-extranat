@@ -12,18 +12,9 @@
 
     <h1>Performances des nageurs DéRapéS</h1>
 
-    <button id="btnScrape" class="btn-sync" onclick="lancerScraping()">
-        🔄 Mettre à jour les nageurs via Extranat
-    </button>
-    <button id="grille_qualif" class="btn-sync"" style="display:block">
-        Grilles de quailification
-    </button>
-    <div id="statusMessage" class="status"></div>
-
-    <!-- Conteneur de sélection du nageur -->
-    <div class="select-container" style="margin: 20px 0;">
-        <label for="selectNageur" style="font-weight: bold; margin-right: 10px;">Sélectionner un nageur :</label>
-        <select id="selectNageur" style="padding: 8px; font-size: 1rem; min-width: 250px;">
+    <!-- Barre d'outils alignée en ligne -->
+    <div class="toolbar">
+        <select id="selectNageur" class="select-input">
             <option value="">-- Choisir un nageur --</option>
             {% for nageur in nageurs %}
             <option value="{{ nageur.licence }}">
@@ -31,23 +22,37 @@
             </option>
             {% endfor %}
         </select>
+
+        <button id="btnScrape" class="btn-sync" onclick="lancerScraping()">
+            🔄 Mettre à jour les nageurs via Extranat
+        </button>
+
+        <a id="grille_qualif" href="{{ url_for('grille_tps') }}" class="btn-sync">
+            📊 Grilles de qualification
+        </a>
     </div>
 
-    <!-- Section d'affichage des performances sous le tableau -->
-    <div id="section-performances" style="display: none; margin-top: 20px;">
-        <table id="table-performances" class="table">
-            <thead>
-                <tr>
-                    <th>Nage</th>
-                    <th>Records</th>
-                    <th>Temps valides</th>
-                    <th>Qualif N2</th>
-                    <th>Qualif N1</th>
-                </tr>
-            </thead>
-            <tbody id="body-performances">
-            </tbody>
-        </table>
+    <div id="statusMessage" class="status"></div>
+
+    <!-- Section d'affichage des performances -->
+    <div id="section-performances" style="display: none;" class="card-container">
+        <h2 id="titre-nageur" class="nageur-title"></h2>
+        
+        <div class="table-responsive">
+            <table id="table-performances" class="modern-table">
+                <thead>
+                    <tr>
+                        <th>Nage</th>
+                        <th>Records</th>
+                        <th>Temps valides (3 saisons)</th>
+                        <th>Qualif N2</th>
+                        <th>Qualif N1</th>
+                    </tr>
+                </thead>
+                <tbody id="body-performances">
+                </tbody>
+            </table>
+        </div>
     </div>
 
     <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>

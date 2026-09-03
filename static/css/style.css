@@ -1,146 +1,198 @@
+/* Base & Barre d'outils */
 body {
-    font-family: Arial, sans-serif;
-    margin: 30px;
-    background-color: #f5f7fa;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background-color: #f8fafc;
+  color: #1e293b;
+  margin: 0;
+  padding: 2rem;
+}
+
+h1 {
+  color: #0f172a;
+  margin-bottom: 1.5rem;
+  font-weight: 700;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+
+.select-input {
+  padding: 10px 14px;
+  font-size: 0.95rem;
+  min-width: 260px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background-color: #ffffff;
+  color: #1e293b;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.select-input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
 }
 
 .btn-sync {
-    padding: 10px 20px;
-    background-color: #007bff;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background-color: #ffffff;
+  color: #334155;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease;
+}
+
+.btn-sync:hover {
+  background-color: #f1f5f9;
+  border-color: #94a3b8;
+  color: #0f172a;
 }
 
 .btn-sync:disabled {
-    background-color: #cccccc;
-}
-
-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 20px;
-}
-
-th, td {
-    border: 1px solid #ddd;
-    padding: 10px;
-    text-align: left;
-}
-
-th {
-    background-color: #f4f4f4;
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .status {
-    margin-top: 10px;
-    font-weight: bold;
+  font-weight: 500;
+  margin-bottom: 1rem;
 }
 
-label {
-    display: block;
-    font-weight: bold;
-    margin-bottom: 5px;
+/* Carte conteneur du tableau */
+.card-container {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e2e8f0;
+  margin-top: 1.5rem;
 }
 
-select, button {
-    padding: 10px;
-    border-radius: 4px;
-    border: 1px solid #ccc;
-    font-size: 16px;
+.nageur-title {
+  font-size: 1.25rem;
+  color: #0f172a;
+  margin-top: 0;
+  margin-bottom: 1.25rem;
+  font-weight: 600;
 }
 
-button#btnScrape {
-    background-color: #0066cc;
-    color: white;
-    border: none;
-    font-weight: bold;
-    cursor: pointer;
-    margin-top: 10px;
+/* Tableau moderne */
+.table-responsive {
+  overflow-x: auto;
 }
 
-button#btnScrape:hover {
-    background-color: #004b99;
+.modern-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.925rem;
 }
 
-#loading {
-    display: none;
-    margin-top: 15px;
-    color: #0066cc;
-    font-weight: bold;
+.modern-table thead tr {
+  background-color: #f8fafc;
+  border-bottom: 2px solid #e2e8f0;
 }
-td.type_bassin {
-    background-color: #7db5ec;
-    font-weight: bold; 
-    text-align: left; 
-    padding: 8px;
+
+.modern-table th {
+  padding: 12px 16px;
+  font-weight: 600;
+  color: #475569;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
 }
-td.nage {
-    font-weight: bold;
-    text-align: center;
+
+.modern-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
 }
+
+/* Alternance de lignes */
+.modern-table tbody tr:nth-child(even) {
+  background-color: #fafafa;
+}
+
+.modern-table tbody tr:hover {
+  background-color: #f1f5f9;
+}
+
+/* En-tête de bassin (séparateur) */
+.modern-table td.type_bassin {
+  background-color: #e2e8f0;
+  color: #1e293b;
+  font-weight: 700;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 8px 16px;
+}
+
+/* Mise en forme des cellules internes */
+.nage {
+  font-weight: 600;
+  color: #0f172a;
+}
+
 .time {
-    font-weight: bold;
-    font-size: 1em;
-    color: #004b99;
+  font-weight: 600;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
 }
+
 .detail {
-    font-style:italic;
-    font-size: small;
+  color: #64748b;
+  font-size: 0.85rem;
 }
+
+.qualif-cell {
+  white-space: nowrap;
+}
+
+/* Badges de qualification */
 .badge-success {
-  color: #2e7d32;
-  font-weight: bold;
-  background-color: #e8f5e9;
-  padding: 2px 6px;
-  border-radius: 4px;
+  display: inline-block;
+  color: #166534;
+  background-color: #dcfce7;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-weight: 700;
+  font-size: 0.8rem;
+  margin-left: 4px;
 }
+
 .badge-danger {
-  color: #c62828;
-  font-weight: bold;
-  background-color: #ffebee;
-  padding: 2px 6px;
-  border-radius: 4px;
+  display: inline-block;
+  color: #991b1b;
+  background-color: #fee2e2;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-weight: 700;
+  font-size: 0.8rem;
+  margin-left: 4px;
 }
+
+.ecart-time {
+  color: #dc2626;
+  font-size: 0.825rem;
+  font-weight: 500;
+  font-family: 'SFMono-Regular', Consolas, monospace;
+}
+
 .icon-record {
-  font-size: 0.9em;
-  margin-left: 3px;
-  cursor: help;
+  font-size: 0.9rem;
+  margin-left: 2px;
 }
-tr.color-F {
-    background-color: #dabaf7;
-}
-tr.color-H {
-    background-color: #91c6ff;
-}
-#table-performances th{
-    background-color: #444;
-    color: #ccc;
-}
-/* Style du tableau */
-#body-performances tr:nth-child(even) {
-  background-color: #f9f9f9; /* Gris très clair */
-}
-
-#body-performances tr:nth-child(odd) {
-  background-color: #ffffff; /* Blanc */
-}
-
-/* Survol de la ligne pour une meilleure lisibilité */
-#body-performances tr:hover {
-  background-color: #f1f1f1; /* Gris légèrement plus foncé au survol */
-}
-
-/* Conserver un style distinct pour les lignes d'en-tête de bassin */
-#body-performances tr .type_bassin {
-  background-color: #e0e0e0; /* Gris moyen pour détacher les séparateurs */
-  font-weight: bold;
-}
-.btn-detail { width: 100%; background-color: #000; color: white; border: none; padding: 5px 10px; border-radius: 8px; cursor: pointer; }
-.btn-detail:hover { background-color: #138496; }
-
-/* Conteneur modale/détail */
-#sectionDetail {  margin-top: 40px; padding: 20px; border: 2px solid #007bff; border-radius: 5px; background-color: #fafafa; display: none; }
-.temps-liste { font-size: 0.85em; list-style-type: none; padding-left: 0; margin: 0; }
-.temps-liste li { margin-bottom: 2px; }
