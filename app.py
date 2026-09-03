@@ -10,14 +10,11 @@ import json
 
 app = Flask(__name__)
 
-# En local : utilise SQLite. Sur Render : utilisera la variable d'environnement
-db_url = os.environ.get('DATABASE_URL', 'sqlite:///database.db')
-
-# Correctif de compatibilité SQLAlchemy pour Render (postgres:// -> postgresql://)
-if db_url.startswith("postgres://"):
-    db_url = db_url.replace("postgres://", "postgresql://", 1)
-
-app.config['SQLALCHEMY_DATABASE_URI'] = db_url
+# Définition d'un chemin absolu vers le fichier SQLite dans le dossier du projet
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(
+    BASE_DIR, 'database.db'
+)
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db.init_app(app)
@@ -83,13 +80,7 @@ def lancer_scraping_nageurs():
         nageurs = Nageur.query.order_by(Nageur.nom_prenom).all()
         
         # Formatage pour la réponse JSON
-        liste_json = [{
-            'licence': n.licence,
-            'nom_prenom': n.nom_prenom,
-            'annee_naissance': n.annee_naissance,
-            'genre': n.genre,
-            'categorie': n.categorie
-        } for n in nageurs]
+        liste_json = [n.to_dict() for n in nageurs]
 
         return jsonify({
             'success': True,

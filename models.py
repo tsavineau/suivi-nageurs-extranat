@@ -61,3 +61,13 @@ class Nageur(db.Model):
         # De C1 à C13 (tranches de 5 ans : 25-29=C1, 30-34=C2, etc.)
         code_cat = 1 + (age - 25) // 5
         return f"C{code_cat}"
+    
+    # Sérialisation de l'objet Nageur
+    def to_dict(self):
+        return {
+            'licence': self.licence,
+            'nom_prenom': self.nom_prenom,
+            'annee_naissance': self.annee_naissance,
+            'genre': self.genre,
+            'categorie': self.categorie,
+        }

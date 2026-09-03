@@ -1,7 +1,7 @@
 async function lancerScraping() {
   const btn = document.getElementById('btnScrape');
   const status = document.getElementById('statusMessage');
-  const tbody = document.getElementById('tableauNageurs');
+  const selectNageur = document.getElementById('selectNageur');
 
   // Blocage du bouton pendant la requête
   btn.disabled = true;
@@ -16,22 +16,29 @@ async function lancerScraping() {
       status.style.color = 'green';
       status.innerText = data.message;
 
-      // Reconstruction du tableau en JS
-      tbody.innerHTML = '';
-      data.nageurs.forEach(n => {
-        const row = `
-                        <tr>
-                            <td>${n.licence}</td>
-                            <td>${n.nom_prenom}</td>
-                            <td>${n.annee_naissance || '-'}</td>
-                            <td>${n.genre || '-'}</td>
-                        </tr>
-                    `;
-        tbody.innerHTML += row;
-      });
+      // Sauvegarde du nageur actuellement sélectionné
+      const currentSelectedIuf = selectNageur.value;
+
+      // Réinitialisation du menu déroulant <select>
+      selectNageur.innerHTML = '<option value="">-- Choisir un nageur --</option>';
+
+      // Reconstruction dynamique des options du <select>
+      if (data.nageurs && data.nageurs.length > 0) {
+        data.nageurs.forEach(n => {
+          const option = document.createElement('option');
+          option.value = n.licence;
+          option.textContent = `${n.nom_prenom}${n.categorie ? ` (${n.categorie})` : ''}`;
+          selectNageur.appendChild(option);
+        });
+
+        // Restauration de la sélection précédente si elle existe toujours
+        if (currentSelectedIuf) {
+          selectNageur.value = currentSelectedIuf;
+        }
+      }
     } else {
       status.style.color = 'red';
-      status.innerText = "Erreur : " + data.erreur;
+      status.innerText = "Erreur : " + (data.erreur || data.message || "Échec du scraping");
     }
   } catch (err) {
     status.style.color = 'red';
