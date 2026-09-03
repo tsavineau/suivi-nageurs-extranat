@@ -58,18 +58,25 @@ function convertirTempsEnSecondes(tempsStr) {
   return parseFloat(parties[0]);
 }
 
+function normaliserBassin(bassin) {
+  const valeur = String(bassin || '').replace('m', '').trim();
+  const bassinNumero = Number.parseInt(valeur, 10);
+  return Number.isNaN(bassinNumero) ? null : bassinNumero;
+}
+
 // Vérifie si au moins une performance de la liste égale ou bat le temps de qualification
-function estQualifie(listePerfs, minimaStr) {
-  if (!minimaStr || minimaStr === '-' || !listePerfs || listePerfs.length === 0) {
+function estQualifie(listePerfs, minima) {
+  if (!minima || minima.temps === '-' || !listePerfs || listePerfs.length === 0) {
     return false;
   }
-  
-  const minimaSec = convertirTempsEnSecondes(minimaStr);
+
+  const minimaSec = convertirTempsEnSecondes(minima.temps);
   if (minimaSec === null) return false;
 
   return listePerfs.some(perf => {
     const tempsSec = convertirTempsEnSecondes(perf.temps);
-    return tempsSec !== null && tempsSec <= minimaSec;
+    return tempsSec !== null && tempsSec <= minimaSec &&
+      normaliserBassin(perf.bassin) === normaliserBassin(minima.bassin);
   });
 }
 
@@ -86,39 +93,30 @@ function formaterEcart(ecartSec) {
 
 // Helper d'affichage pour les colonnes de minima
 function genererCelluleMinima(listePerfs, minimaStr) {
-  if (!minimaStr || minimaStr === '-') return '-';
+  if (!minimaStr || minimaStr.length === 0) return '-';
 
-  const qualifie = estQualifie(listePerfs, minimaStr);
+  const minima = minimaStr.filter(item => item.temps !== '-');
+  if (minima.length === 0) return '-';
 
-  if (qualifie) {
-    return `${minimaStr} <span class="badge-success">✓</span>`;
-  }
+  return minima.map(item => {
+    const badge = item.qualifie
+      ? '<span class="badge-success">✓</span>'
+      : '<span class="badge-danger">✗</span>';
+    const performancesBassin = (listePerfs || []).filter(perf =>
+      normaliserBassin(perf.bassin) === normaliserBassin(item.bassin)
+    );
+    const meilleursTemps = performancesBassin
+      .map(perf => convertirTempsEnSecondes(perf.temps))
+      .filter(temps => temps !== null);
+    const ecartSec = meilleursTemps.length > 0
+      ? Math.min(...meilleursTemps) - convertirTempsEnSecondes(item.temps)
+      : 0;
+    const ecart = !item.qualifie && meilleursTemps.length > 0
+      ? `<span class="ecart-time">${formaterEcart(ecartSec)}</span>`
+      : '';
 
-  // S'il n'y a pas de performances enregistrées dans la liste, on n'affiche aucun écart
-  if (!listePerfs || listePerfs.length === 0) {
-    return `${minimaStr} <span class="badge-danger">✗</span>`;
-  }
-
-  // Calcul du meilleur temps réalisé parmi les perfs disponibles
-  const tempsSecList = listePerfs
-    .map(p => convertirTempsEnSecondes(p.temps))
-    .filter(t => t !== null);
-
-  if (tempsSecList.length === 0) {
-    return `${minimaStr} <span class="badge-danger">✗</span>`;
-  }
-
-  const meilleurTemps = Math.min(...tempsSecList);
-  const minimaSec = convertirTempsEnSecondes(minimaStr);
-
-  if (minimaSec === null) {
-    return `${minimaStr} <span class="badge-danger">✗</span>`;
-  }
-
-  const ecartSec = meilleurTemps - minimaSec;
-  const strEcart = formaterEcart(ecartSec);
-
-  return `${minimaStr} <span class="badge-danger">✗</span><span class="ecart-time">${strEcart}</span>`;
+    return `<div class="minima-line">${item.temps} (${item.bassin}m) ${badge}${ecart}</div>`;
+  }).join('');
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -178,8 +176,15 @@ document.addEventListener('DOMContentLoaded', () => {
             : '-';
 
           // Génération de l'affichage N1 et N2 avec gestion de l'éventuel écart
-          const strN2 = genererCelluleMinima(perfsSaisons, item.minima_n2);
-          const strN1 = genererCelluleMinima(perfsSaisons, item.minima_n1);
+          const perfsQualification = item.perfs_qualification || perfsSaisons;
+          const strN2 = genererCelluleMinima(
+            perfsQualification,
+            item.minima_n2
+          );
+          const strN1 = genererCelluleMinima(
+            perfsQualification,
+            item.minima_n1
+          );
 
           // Construction de la ligne du tableau
           const row = document.createElement('tr');

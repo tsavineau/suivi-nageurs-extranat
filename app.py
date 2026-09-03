@@ -3,7 +3,7 @@ from flask import Flask, render_template, request, jsonify
 from flask_caching import Cache
 from models import db, TempsQualification, Nageur
 from constants import nettoyer_epreuve
-from scraper import scraper_et_enregistrer_temps, obtenir_qualifies_club, enregistrer_nageurs_bdd
+from scraper import scraper_et_enregistrer_temps, obtenir_qualifies_club, enregistrer_nageurs_bdd, convertir_en_secondes
 from extranatapi import Wrapper
 import os
 import json
@@ -43,25 +43,51 @@ def get_annee_saison_courante() -> str:
     return str(annee)
 
 def chercher_temps_qualif(annee, genre_db, epreuve, bassin, categorie, type_qualif_code):
-    """Recherche un temps de qualification (compatible SQLAlchemy 2.0)."""
-    try:
-        bassin_int = int(str(bassin).replace('m', '').strip())
-    except (ValueError, TypeError):
+    # Le bassin n'est pas discriminant pour les codes N1/N2 50 m.
+    filtres = {
+        'annee': annee,
+        'genre': genre_db,
+        'epreuve': epreuve,
+        'categorie': categorie,
+        'type_qualif': str(type_qualif_code),
+    }
+    if bassin is not None:
+        filtres['bassin'] = bassin
+
+    stmt = db.select(TempsQualification).filter_by(**filtres).limit(2)
+    enregistrements = db.session.execute(stmt).scalars().all()
+    temps = [enregistrement.temps for enregistrement in enregistrements if enregistrement.temps]
+
+    if not temps:
         return '-'
+    return temps[0] if len(temps) == 1 else temps
 
-    # Requête construite avec db.select()
-    stmt = db.select(TempsQualification).filter_by(
-        annee=2026,
-        genre=genre_db,
-        epreuve=epreuve,
-        bassin=bassin_int,
-        categorie=categorie,
-        type_qualif=str(type_qualif_code)
-    )
-    
-    enregistrement = db.session.execute(stmt).scalar_one_or_none()
+def obtenir_derniere_annee_qualif(annee_max):
+    return db.session.execute(
+        db.select(TempsQualification.annee)
+        .where(TempsQualification.annee <= str(annee_max))
+        .order_by(TempsQualification.annee.desc())
+        .limit(1)
+    ).scalar_one_or_none() or str(annee_max)
 
-    return enregistrement.temps if enregistrement and enregistrement.temps else '-'
+def normaliser_bassin(bassin):
+    bassin_str = str(bassin).replace('m', '').strip()
+    return int(bassin_str) if bassin_str.isdigit() else None
+
+def est_qualifie(performances, minima):
+    for minimum in minima:
+        temps_minimum = convertir_en_secondes(minimum['temps'])
+        if temps_minimum is None:
+            continue
+
+        for performance in performances:
+            if normaliser_bassin(performance['bassin']) != minimum['bassin']:
+                continue
+            temps_performance = convertir_en_secondes(performance['temps'])
+            if temps_performance is not None and temps_performance <= temps_minimum:
+                return True
+
+    return False
 
 @app.route('/')
 def afficher_nageurs():
@@ -157,7 +183,7 @@ def get_nageur_summary(iuf):
         # Conversion du genre pour la table tps_qualif ('H' -> '1', 'F' -> '2')
         genre_qualif = '1' if nageur_db.genre == 'H' else '2'
         categorie_qualif = nageur_db.categorie
-        annee_saison = int(get_annee_saison_courante())
+        annee_saison = int(obtenir_derniere_annee_qualif(get_annee_saison_courante()))
 
         # Définition du seuil : saison courante et les 2 précédentes (ex: 2026, 2025, 2024)
         saison_min = annee_saison - 2
@@ -173,17 +199,20 @@ def get_nageur_summary(iuf):
         summary_data = []
 
         for mpp in obj_mpp.nages:
-            bassin_str = str(mpp.bassin).replace('m', '').strip()
-            bassin_int = int(bassin_str) if bassin_str.isdigit() else 25
+            bassin_int = normaliser_bassin(mpp.bassin) or 25
 
             # Codes qualification selon le bassin
             code_n1 = '85' if bassin_int == 25 else '84'
             code_n2 = '87' if bassin_int == 25 else '86'
+            qualification_multi_bassin = code_n1 == '84' or code_n2 == '86'
 
             # Filtrer toutes les performances de la même nage/bassin réalisées lors des 3 dernières saisons
             historique_filtre = []
+            performances_qualification = []
             for n in obj_all.nages:
-                if n.name == mpp.name and n.bassin == mpp.bassin:
+                if n.name == mpp.name and (
+                    normaliser_bassin(n.bassin) == bassin_int or qualification_multi_bassin
+                ):
                     # Extraction de l'année de la perf (gère un objet datetime ou un string "DD/MM/YYYY")
                     if isinstance(n.date, str):
                         annee_perf = int(n.date.split('/')[-1])
@@ -193,31 +222,41 @@ def get_nageur_summary(iuf):
                         annee_perf = 0
 
                     if annee_perf >= saison_min:
-                        historique_filtre.append({
+                        performance = {
                             'temps': n.temps,
                             'points': n.points,
                             'date': n.date,
                             'annee': annee_perf,
-                        })
+                            'bassin': normaliser_bassin(n.bassin),
+                        }
+                        performances_qualification.append(performance)
+                        if normaliser_bassin(n.bassin) == bassin_int:
+                            historique_filtre.append(performance)
 
-            # Recommandation : requêtes SQL sur la table tps_qualif
-            t_n1 = chercher_temps_qualif(
-                annee=annee_saison,
-                genre_db=genre_qualif,
-                epreuve=nettoyer_epreuve(mpp.name),
-                bassin=bassin_int,
-                categorie=categorie_qualif,
-                type_qualif_code=code_n1,
-            )
+            # requêtes SQL sur la table tps_qualif
+            def charger_minima(type_qualif_code):
+                bassins = (25, 50) if type_qualif_code in ('84', '86') else (bassin_int,)
+                return [
+                    {
+                        'bassin': bassin,
+                        'temps': temps,
+                        'qualifie': est_qualifie(performances_qualification, [
+                            {'bassin': bassin, 'temps': temps}
+                        ]),
+                    }
+                    for bassin in bassins
+                    for temps in [chercher_temps_qualif(
+                            annee=annee_saison,
+                            genre_db=genre_qualif,
+                            epreuve=nettoyer_epreuve(mpp.name),
+                            bassin=bassin,
+                            categorie=categorie_qualif,
+                            type_qualif_code=type_qualif_code,
+                        )]
+                ]
 
-            t_n2 = chercher_temps_qualif(
-                annee=annee_saison,
-                genre_db=genre_qualif,
-                epreuve=nettoyer_epreuve(mpp.name),
-                bassin=bassin_int,
-                categorie=categorie_qualif,
-                type_qualif_code=code_n2,
-            )
+            t_n1 = charger_minima(code_n1)
+            t_n2 = charger_minima(code_n2)
 
             summary_data.append({
                 'nage': mpp.name,
@@ -228,8 +267,11 @@ def get_nageur_summary(iuf):
                     'date': mpp.date,
                 },
                 'perfs_trois_saisons': historique_filtre,
+                'perfs_qualification': performances_qualification,
                 'minima_n1': t_n1,
                 'minima_n2': t_n2,
+                'qualification_n1': est_qualifie(performances_qualification, t_n1),
+                'qualification_n2': est_qualifie(performances_qualification, t_n2),
             })
 
         return (
