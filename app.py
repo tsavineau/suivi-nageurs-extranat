@@ -87,8 +87,6 @@ def est_qualifie(performances, minima):
             continue
 
         for performance in performances:
-            if normaliser_bassin(performance['bassin']) != minimum['bassin']:
-                continue
             temps_performance = convertir_en_secondes(performance['temps'])
             if temps_performance is not None and temps_performance <= temps_minimum:
                 return True
@@ -271,19 +269,15 @@ def get_nageur_summary(iuf):
             # Codes qualification selon le bassin
             code_n1 = '85' if bassin_int == 25 else '84'
             code_n2 = '87' if bassin_int == 25 else '86'
-            qualification_multi_bassin = code_n1 == '84' or code_n2 == '86'
 
-            # Les qualifications 50 m prennent en compte les performances des deux bassins.
+            # Les qualifications prennent en compte les performances des deux bassins.
             historique_filtre = performances_par_nage_bassin.get((mpp.name, bassin_int), [])
-            if qualification_multi_bassin:
-                performances_qualification = [
-                    performance
-                    for (nom_nage, _), performances in performances_par_nage_bassin.items()
-                    if nom_nage == mpp.name
-                    for performance in performances
-                ]
-            else:
-                performances_qualification = historique_filtre
+            performances_qualification = [
+                performance
+                for (nom_nage, _), performances in performances_par_nage_bassin.items()
+                if nom_nage == mpp.name
+                for performance in performances
+            ]
 
             # requêtes SQL sur la table tps_qualif
             def charger_minima(type_qualif_code):
@@ -309,7 +303,7 @@ def get_nageur_summary(iuf):
             t_n2 = charger_minima(code_n2)
 
             summary_data.append({
-                'nage': mpp.name,
+                'nage': nettoyer_epreuve(mpp.name),
                 'bassin': mpp.bassin,
                 'mpp': {
                     'temps': mpp.temps,

@@ -149,15 +149,73 @@ function genererCelluleMinima(performancesParBassin, minimaStr) {
   }).join('');
 }
 
+function contientMinimaValide(minimaStr) {
+  return Array.isArray(minimaStr) && minimaStr.some(item => item.qualifie);
+}
+
+function genererRecapitulatifQualifications(performances, afficherQualifN2) {
+  const qualifications = new Map([
+    ['N1 25m', new Set()],
+    ['N1 50m', new Set()],
+    ['N2 25m', new Set()],
+    ['N2 50m', new Set()]
+  ]);
+  const nageurEstN1 = performances.some(item => contientMinimaValide(item.minima_n1));
+
+  performances.forEach(item => {
+    const n1Valide = contientMinimaValide(item.minima_n1);
+    const nage = echapperHtml(item.nage);
+
+    if (n1Valide) {
+      const minimaN1Valides = item.minima_n1.filter(minima => minima.qualifie);
+      minimaN1Valides.forEach(minima => {
+        const bassinMinima = normaliserBassin(minima.bassin);
+        qualifications.get(bassinMinima === 25 ? 'N1 25m' : 'N1 50m').add(nage);
+        if (bassinMinima === 25 && item.nage !== '100 4N') {
+          qualifications.get('N1 50m').add(nage);
+        }
+      });
+      return;
+    }
+
+    if (!nageurEstN1 && contientMinimaValide(item.minima_n2)) {
+      const minimaN2Valides = item.minima_n2.filter(minima => minima.qualifie);
+      minimaN2Valides.forEach(minima => {
+        const bassinMinima = normaliserBassin(minima.bassin);
+        qualifications.get(bassinMinima === 25 ? 'N2 25m' : 'N2 50m').add(nage);
+        if (bassinMinima === 25 && item.nage !== '100 4N.') {
+          qualifications.get('N2 50m').add(nage);
+        }
+      });
+    }
+  });
+
+  const lignes = [...qualifications.entries()]
+    .filter(([, nages]) => nages.size > 0)
+    .map(([libelle, nages]) => `<div><strong>${libelle} :</strong> ${[...nages].join(', ')}</div>`)
+    .join('');
+
+  return `
+    <tr class="qualification-summary">
+      <td colspan="${afficherQualifN2 ? 5 : 4}">
+        <strong>Qualifications obtenues</strong>
+        ${lignes || '<div>Aucune qualification</div>'}
+      </td>
+    </tr>
+  `;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   const selectNageur = document.getElementById('selectNageur');
   const sectionPerf = document.getElementById('section-performances');
   const bodyPerf = document.getElementById('body-performances');
   const titreNageur = document.getElementById('titre-nageur');
+  const enTeteQualifN2 = document.getElementById('en-tete-qualif-n2');
 
   selectNageur.addEventListener('change', async () => {
     const iuf = selectNageur.value;
     if (!iuf) {
+      enTeteQualifN2.hidden = false;
       sectionPerf.style.display = 'none';
       return;
     }
@@ -170,12 +228,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const data = await response.json();
       bodyPerf.innerHTML = '';
+      const afficherQualifN2 = !data.performances?.some(item => contientMinimaValide(item.minima_n1));
+      enTeteQualifN2.hidden = !afficherQualifN2;
 
       if (!data.performances || data.performances.length === 0) {
-        bodyPerf.innerHTML = '<tr><td colspan="5">Aucune performance trouvée.</td></tr>';
+        bodyPerf.innerHTML = `<tr><td colspan="${afficherQualifN2 ? 5 : 4}">Aucune performance trouvée.</td></tr>`;
       } else {
         let bassinActuel = null;
         const fragment = document.createDocumentFragment();
+
+        bodyPerf.insertAdjacentHTML(
+          'beforeend',
+          genererRecapitulatifQualifications(data.performances, afficherQualifN2)
+        );
 
         data.performances.forEach(item => {
           // Séparateur de bassin
@@ -209,10 +274,6 @@ document.addEventListener('DOMContentLoaded', () => {
           // Génération de l'affichage N1 et N2 avec gestion de l'éventuel écart
           const perfsQualification = item.perfs_qualification || perfsSaisons;
           const performancesParBassin = indexerPerformancesParBassin(perfsQualification);
-          const strN2 = genererCelluleMinima(
-            performancesParBassin,
-            item.minima_n2
-          );
           const strN1 = genererCelluleMinima(
             performancesParBassin,
             item.minima_n1
@@ -224,7 +285,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <td class="nage">${echapperHtml(item.nage)}</td>
             <td>${mppStr}</td>
             <td>${perfsSaisonsStr}</td>
-            <td class="qualif-cell">${strN2}</td>
+            ${afficherQualifN2 ? `<td class="qualif-cell">${genererCelluleMinima(performancesParBassin, item.minima_n2)}</td>` : ''}
             <td class="qualif-cell">${strN1}</td>
           `;
           fragment.appendChild(row);
